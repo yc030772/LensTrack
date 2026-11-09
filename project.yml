@@ -1,0 +1,24 @@
+name: LensTrack
+options:
+  bundleIdPrefix: com.hourloop
+  deploymentTarget:
+    iOS: "17.0"
+targets:
+  LensTrack:
+    type: application
+    platform: iOS
+    sources: [LensTrack]
+    info:
+      path: LensTrack/Info.plist
+      properties:
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        CFBundleDisplayName: LensTrack
+        NSMicrophoneUsageDescription: LensTrack listens so you can log eye drops by voice.
+        NSSpeechRecognitionUsageDescription: LensTrack turns your voice into an event entry.
+    settings:
+      base:
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: 45D3YYLHR4

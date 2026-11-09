@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LensTrack Simulator</title>
+<style>
+:root{--bg:#e9ebee;--screen:#f2f3f5;--card:#fff;--text:#111;--muted:#6b7280;--line:#e5e7eb;--teal:#0e8c8c;--teal-bg:#d9f0f0;--red:#d93025;--red-bg:#fbe4e2;--green:#1a8f4a;--green-bg:#def5e7;--orange:#d97706;--orange-bg:#fdebd3;--frame:#111;--chip:#e3e5e8}
+:root[data-theme=dark]{--bg:#0f1115;--screen:#15181d;--card:#1f232a;--text:#f3f4f6;--muted:#9ca3af;--line:#2d323b;--teal:#2dd4bf;--teal-bg:#123a3a;--red:#f87171;--red-bg:#3f1d1d;--green:#4ade80;--green-bg:#143221;--orange:#fbbf24;--orange-bg:#3a2a0f;--frame:#2a2d33;--chip:#2a2f37}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:-apple-system,"SF Pro Text",Inter,system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;gap:16px;padding:16px}
+#controls{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+#controls button,#controls select{font:600 16px inherit;padding:10px 16px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer;min-height:48px}
+#stage{flex:1;display:flex;align-items:center;justify-content:center;width:100%}
+#phone{background:var(--frame);border-radius:56px;padding:14px;box-shadow:0 30px 60px rgba(0,0,0,.35);transform-origin:top center}
+#screen{position:relative;background:var(--screen);border-radius:44px;overflow:hidden;display:flex;flex-direction:column}
+#island{position:absolute;left:50%;top:12px;transform:translateX(-50%);width:120px;height:34px;background:#000;border-radius:20px;z-index:3}
+#status{height:58px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 32px 6px;font-weight:700;font-size:17px}
+#content{flex:1;overflow-y:auto;padding:12px 18px 18px;scrollbar-width:none}
+#content::-webkit-scrollbar{display:none}
+#tabs{display:flex;border-top:1px solid var(--line);padding:10px 8px 26px;background:var(--card)}
+#tabs button{flex:1;background:none;border:0;color:var(--muted);font:600 13px inherit;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;padding:6px 0}
+#tabs button.on{color:var(--teal)}
+#tabs svg{width:28px;height:28px;stroke:currentColor;fill:none;stroke-width:2}
+h1{font-size:30px;margin:4px 0 6px;letter-spacing:-.5px}
+.eyebrow{font-size:13px;font-weight:700;color:var(--muted);letter-spacing:.5px;margin:10px 0 8px}
+.sub{color:var(--muted);font-size:15px;margin:0 0 10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px;position:relative}
+.card.bar::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:4px;border-radius:2px;background:var(--accent,var(--teal))}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;padding:4px 10px;border-radius:999px}
+.pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.pill.normal{color:var(--green);background:var(--green-bg)}.pill.watch{color:var(--orange);background:var(--orange-bg)}.pill.alert{color:var(--red);background:var(--red-bg)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.metric .name{font-weight:700;font-size:17px}.metric .val{font-size:38px;font-weight:800;letter-spacing:-1px;line-height:1.1;margin:4px 0}.metric .val small{font-size:14px;font-weight:500;color:var(--muted);margin-left:4px}.metric .rng{font-size:13px;color:var(--muted);margin-bottom:8px}
+.banner{background:var(--red-bg);border-radius:14px;padding:14px;display:flex;gap:10px;margin-bottom:14px}.banner b{display:block;font-size:17px;margin-bottom:4px}.banner p{margin:0;font-size:15px;line-height:1.35}
+.btn{display:block;width:100%;min-height:60px;border-radius:16px;border:1px solid var(--line);background:var(--card);color:var(--text);font:700 19px inherit;cursor:pointer}
+.btn.primary{background:var(--teal);color:#fff;border:0}
+.seg{display:flex;background:var(--chip);border-radius:12px;padding:3px;margin-bottom:12px}.seg button{flex:1;border:0;background:none;font:600 16px inherit;padding:10px;border-radius:10px;color:var(--text);cursor:pointer}.seg button.on{background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.chips{display:flex;gap:8px;overflow-x:auto;margin-bottom:12px;scrollbar-width:none}.chips button{white-space:nowrap;border:0;border-radius:999px;padding:9px 14px;font:600 15px inherit;background:var(--chip);color:var(--text);cursor:pointer}.chips button.on{color:#fff}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}.stats .card{margin:0;padding:12px}.stats .k{font-size:13px;color:var(--muted)}.stats .v{font-weight:800;font-size:17px;margin-top:4px}
+.insight{background:var(--teal-bg);border-radius:14px;padding:14px;font-size:15px;line-height:1.4}.insight b{display:block;font-size:17px;margin-bottom:4px}
+.row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);font-size:15px}.row:last-child{border:0}.row .t{font-family:ui-monospace,Menlo,monospace;font-weight:600}.row .s{font-size:13px;color:var(--muted)}.row .v{font-family:ui-monospace,Menlo,monospace}
+canvas{width:100%;height:220px;display:block}
+.qr{background:#1b2630;border-radius:18px;height:270px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:#fff;margin:12px 0}
+.qr .box{width:150px;height:150px;border:4px solid #fff;border-radius:12px;position:relative;overflow:hidden;background:repeating-conic-gradient(#fff 0 25%,#1b2630 0 50%) 0 0/30px 30px}
+.qr .scan{position:absolute;left:0;right:0;height:3px;background:var(--teal);animation:scan 1.4s ease-in-out infinite alternate}
+@keyframes scan{from{top:8px}to{top:138px}}
+.dev{display:flex;align-items:center;gap:12px;padding:14px;border:2px solid var(--line);border-radius:14px;background:var(--card);margin-bottom:10px;cursor:pointer}.dev.on{border-color:var(--teal)}.dev b{display:block;font-size:17px}.dev span{font-size:14px;color:var(--muted)}
+.step{display:flex;gap:12px;align-items:flex-start;margin:10px 0;font-size:16px}.step i{font-style:normal;font-weight:700;width:26px;height:26px;border-radius:50%;background:var(--chip);display:inline-flex;align-items:center;justify-content:center;font-size:13px;flex:none}
+.spacer{flex:1}
+</style>
+</head>
+<body>
+<div id="controls">
+  <select id="model"><option value="393,852">iPhone 16</option><option value="430,932">iPhone 16 Pro Max</option><option value="375,812">iPhone 13 mini</option></select>
+  <button id="theme">🌙 Dark mode</button>
+  <button id="reset">↺ Reset data</button>
+</div>
+<div id="stage"><div id="phone"><div id="screen">
+  <div id="island"></div>
+  <div id="status"><span id="clock">9:41</span><span>●●●● ⚡︎</span></div>
+  <div id="content"></div>
+  <div id="tabs"></div>
+</div></div></div>
+
+<script>
+// ---------- fake data (same rules as the iOS app) ----------
+const METRICS = {
+  iop:{name:"Eye pressure",short:"Eye pressure",unit:"mmHg",lo:10,hi:21,dec:1,color:"#5b5bd6"},
+  glucose:{name:"Glucose",short:"Glucose",unit:"mmol/L",lo:3.9,hi:10,dec:1,color:"#e8891d"},
+  osmolarity:{name:"Osmolarity",short:"Osmolarity",unit:"mOsm/L",lo:275,hi:308,dec:0,color:"#1a9d5a"},
+  temp:{name:"Temperature",short:"Eye temp.",unit:"°C",lo:33.5,hi:35.5,dec:1,color:"#a73bd6"},
+};
+const WINDOWS={"1 h":3600,"6 h":21600,"24 h":86400};
+const fmt=(m,v)=>v.toFixed(METRICS[m].dec);
+const hm=d=>d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});
+const hms=d=>d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+
+let readings, st;
+function nextReading(t){
+  const h=Math.max(0,(Date.now()-t)/3.6e6);
+  const tgt={glucose:5.6+1.2*Math.sin(h*.5+1), iop:h<2.5?17+(2.5-h)*2.3:17+2.5*Math.sin(h*.9), osmolarity:301+6*Math.sin(h*.7), temp:34.5+.4*Math.sin(h*.3)};
+  const noise={glucose:.08,iop:.25,osmolarity:.8,temp:.05};
+  for(const k in st) st[k]+=.3*(tgt[k]-st[k])+(Math.random()*2-1)*noise[k];
+  return {time:t,...st,manual:Math.floor(t/6e4)%180===0};
+}
+function seed(){
+  st={glucose:5.6,iop:18,osmolarity:300,temp:34.5}; readings=[];
+  const start=Date.now()-86400e3;
+  for(let m=0;m<=1440;m++) readings.push(nextReading(start+m*6e4));
+}
+const inWindow=w=>{const c=Date.now()-WINDOWS[w]*1e3;return readings.filter(r=>r.time>=c)};
+function stats(m,w){
+  const rs=inWindow(w),v=rs.map(r=>r[m]);
+  let pi=0,li=0;v.forEach((x,i)=>{if(x>v[pi])pi=i;if(x<v[li])li=i});
+  return {mean:v.reduce((a,b)=>a+b,0)/v.length,peak:v[pi],low:v[li],peakAt:rs[pi].time,lowAt:rs[li].time,swing:v[pi]-v[li],n:rs.length};
+}
+function conditions(w){
+  const rs=inWindow(w),n=rs.length,iop=stats("iop",w),osm=stats("osmolarity",w),glu=stats("glucose",w),tmp=stats("temp",w);
+  const above=rs.filter(r=>r.iop>21).length, osmHigh=rs.filter(r=>r.osmolarity>308).length/n, inRange=rs.filter(r=>r.glucose>=3.9&&r.glucose<=10).length/n;
+  return [
+    {name:"Glaucoma",status:above>10||iop.swing>6?"alert":above>0?"watch":"normal",summary:`Mean ${fmt("iop",iop.mean)} · Peak ${fmt("iop",iop.peak)} · Swing ${fmt("iop",iop.swing)} mmHg`,th:"Threshold: IOP > 21 mmHg or swing > 6 mmHg."},
+    {name:"Dry eye",status:osm.mean>308||osmHigh>.25?"watch":"normal",summary:`Mean ${osm.mean.toFixed(0)} mOsm/L · ${Math.round(osmHigh*100)}% of readings > 308`,th:"Threshold: mean > 308, or > 25% of readings above 308."},
+    {name:"Diabetes",status:inRange<.7||rs.some(r=>r.glucose<3.9)?"alert":"normal",summary:`Mean ${fmt("glucose",glu.mean)} mmol/L · ${Math.round(inRange*100)}% in range 3.9–10`,th:"Threshold: under 70% in range, or any value < 3.9."},
+    {name:"Ocular surface inflammation",status:tmp.mean>35.5?"alert":"normal",summary:`Mean ${fmt("temp",tmp.mean)} °C · Peak ${fmt("temp",tmp.peak)} °C`,th:"Threshold: mean temperature > 35.5 °C."},
+  ];
+}
+
+// ---------- state ----------
+let view="scan", tab="overview", win="6 h", metric="iop", lastSync=Date.now();
+const S={normal:"Normal",watch:"Watch",alert:"Alert"};
+const pill=s=>`<span class="pill ${s}">${S[s]}</span>`;
+const $=sel=>document.querySelector(sel);
+
+// ---------- screens ----------
+const screens={
+  scan(){ setTimeout(()=>{if(view==="scan"){view="pair";render()}},3000);
+    return `<p class="eyebrow" style="color:var(--teal)">STEP 1 OF 2</p><h1>Connect your record</h1>
+    <p class="sub">Scan the QR code from your clinic. It opens an anonymous record that holds no names.</p>
+    <div class="qr"><div class="box"><div class="scan"></div></div><span style="font-size:14px;opacity:.8">Fit the code inside the frame</span></div>
+    <p class="sub" style="font-size:13px">The code is detected automatically. Camera access is required.</p>
+    <div class="spacer" style="height:60px"></div><button class="btn" onclick="view='pair';render()">Enter code manually</button>`},
+  pair(){ return `<p class="eyebrow" style="color:var(--teal)">STEP 2 OF 2</p><h1>Pair your smart lens</h1>
+    <div class="card" style="background:var(--teal-bg);border:0"><b>✓ Record PT-0001 verified</b><div class="sub" style="margin:2px 0 0">Code issued by your clinic · anonymous</div></div>
+    <p class="eyebrow">NEARBY DEVICES</p>
+    <div class="dev on"><div><b>LensTrack L-204</b><span>Right eye · Battery 82%</span></div><div class="spacer"></div>${pill("normal").replace("Normal","Strong signal")}</div>
+    <div class="dev"><div><b>LensTrack L-198</b><span>Left eye · Battery 41%</span></div><div class="spacer"></div>${pill("watch").replace("Watch","Weak signal")}</div>
+    <p class="eyebrow">HOW TO PAIR</p>
+    <div class="step"><i>1</i>Put the lens in and blink a few times to wake it.</div><div class="step"><i>2</i>Hold your phone within 1 metre of your eye.</div><div class="step"><i>3</i>Select your lens, then tap Pair.</div>
+    <div style="height:30px"></div><button class="btn primary" onclick="view='main';render()">Pair L-204</button>`},
+  overview(){ const r=readings.at(-1), g=conditions("6 h")[0], h=new Date().getHours(), greet=h<12?"Good morning":h<18?"Good afternoon":"Good evening";
+    const above=inWindow("6 h").filter(x=>x.iop>21).length, peak=stats("iop","6 h").peak;
+    return `<p class="eyebrow">PT-0001 · RIGHT EYE</p><h1>${greet}</h1>
+    <p class="sub">${pill("normal").replace("Normal","Streaming")} &nbsp;updated ${Math.round((Date.now()-lastSync)/1000)} s ago · L-204</p>
+    ${g.status!=="normal"?`<div class="banner"><span style="color:var(--red);font-size:22px">⚠</span><div><b>Eye pressure above range</b><p>${above} readings above 21 mmHg in the last 6 h, peak ${fmt("iop",peak)} mmHg. Tell your doctor if you have eye pain or blurred vision.</p></div></div>`:""}
+    <p class="eyebrow">CURRENT READINGS</p><div class="grid">${["glucose","iop","osmolarity","temp"].map(m=>{const M=METRICS[m],v=r[m],ok=v>=M.lo&&v<=M.hi;
+      return `<div class="card bar metric" style="--accent:${M.color};margin:0"><div class="name">${M.short}</div><div class="val">${fmt(m,v)}<small>${M.unit}</small></div><div class="rng">Range ${fmt(m,M.lo)}–${fmt(m,M.hi)}</div>${pill(ok?"normal":"alert")}</div>`}).join("")}</div>
+    <div class="card"><b>◎ Lens L-204</b><div class="sub" style="margin:4px 0 0">Battery 82% · Strong signal · Synced ${hm(new Date(lastSync))}</div></div>`},
+  trends(){ const s=stats(metric,win),M=METRICS[metric],rs=inWindow(win),out=rs.filter(r=>r[metric]<M.lo||r[metric]>M.hi).length;
+    let ins=`${M.name} was lowest at ${hm(new Date(s.lowAt))} and rose to a peak of ${fmt(metric,s.peak)} at ${hm(new Date(s.peakAt))}. ${out?`${out} of ${rs.length} readings were outside the normal band.`:`All ${rs.length} readings were inside the normal band.`}`;
+    if(metric==="iop"&&s.swing>6) ins+=` The ${s.swing.toFixed(1)} mmHg swing exceeds the 6 mmHg threshold.`;
+    return `<h1>Trends</h1><p class="sub">PT-0001 · ${hm(new Date(rs[0].time))} – ${hm(new Date())}</p>${segHTML()}
+    <div class="chips">${Object.keys(METRICS).map(m=>`<button class="${m===metric?"on":""}" style="${m===metric?`background:${METRICS[m].color}`:""}" onclick="metric='${m}';render()">${METRICS[m].name}</button>`).join("")}</div>
+    <div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div><b style="font-size:17px">${M.name}</b><div class="sub" style="margin:2px 0 8px">${M.unit} · green band = ${fmt(metric,M.lo)}–${fmt(metric,M.hi)}</div></div><div style="font-size:30px;font-weight:800;color:${M.color}">${fmt(metric,readings.at(-1)[metric])}</div></div><canvas id="chart"></canvas></div>
+    <div class="stats"><div class="card"><div class="k">Mean</div><div class="v">${fmt(metric,s.mean)} ${M.unit}</div></div><div class="card"><div class="k">Peak</div><div class="v">${fmt(metric,s.peak)} ${M.unit}</div></div><div class="card"><div class="k">Swing</div><div class="v">${fmt(metric,s.swing)} ${M.unit}</div></div></div>
+    <div class="insight"><b>Insight</b>${ins}</div>`},
+  conditions(){ return `<h1>Condition tracking</h1><p class="sub">PT-0001 · last ${win} · ${inWindow(win).length} readings</p>${segHTML()}
+    ${conditions(win).map(c=>`<div class="card bar" style="--accent:var(--${c.status==="normal"?"green":c.status==="watch"?"orange":"red"})"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:19px">${c.name}</b>${pill(c.status)}</div><div style="margin:6px 0 4px;font-size:16px">${c.summary}</div><div class="sub" style="margin:0;font-size:14px">${c.th}</div></div>`).join("")}
+    <p class="sub" style="font-size:14px">Thresholds are for reference only and do not replace a doctor's diagnosis.</p>`},
+  history(){ const rs=inWindow("6 h").slice().reverse();
+    return `<h1>History</h1><p class="sub">${rs.length} readings · last 6 h</p><p class="sub" style="font-size:14px">Glucose · IOP · Osmolarity · Temp.</p>
+    <div class="card" style="display:flex;gap:12px;align-items:center"><span style="font-size:28px;background:var(--teal-bg);border-radius:10px;padding:4px 8px">▦</span><div><b>Share with your doctor</b><div class="sub" style="margin:2px 0 0;font-size:14px">Your doctor scans the code to view record PT-0001. You can revoke access at any time.</div></div></div>
+    <button class="btn" onclick="downloadCSV()">Download CSV</button>
+    <div class="card" style="margin-top:12px;padding:4px 14px">${rs.slice(0,120).map(r=>`<div class="row"><div><div class="t">${hms(new Date(r.time))}</div><div class="s">${r.manual?"Manual entry":"Lens · auto"}</div></div><div class="v">${r.manual?`${fmt("glucose",r.glucose)} · – · – · –`:`${fmt("glucose",r.glucose)} · ${fmt("iop",r.iop)} · ${fmt("osmolarity",r.osmolarity)} · ${fmt("temp",r.temp)}`}</div></div>`).join("")}</div>`},
+};
+const segHTML=()=>`<div class="seg">${Object.keys(WINDOWS).map(w=>`<button class="${w===win?"on":""}" onclick="win='${w}';render()">${w}</button>`).join("")}</div>`;
+
+const TABS=[["overview","Overview","M3 11l9-8 9 8v10a1 1 0 01-1 1h-5v-7h-6v7H4a1 1 0 01-1-1z"],["trends","Trends","M3 3v18h18M7 14l4-4 4 3 5-6"],["conditions","Conditions","M3 12h4l3-7 4 14 3-7h4"],["history","History","M12 2a10 10 0 110 20 10 10 0 010-20zm0 5v5l3 2"]];
+
+function render(){
+  const c=$("#content"), top=c.scrollTop;
+  c.innerHTML = view==="main" ? screens[tab]() : screens[view]();
+  $("#tabs").style.display = view==="main"?"flex":"none";
+  $("#tabs").innerHTML = TABS.map(([k,l,p])=>`<button class="${k===tab?"on":""}" onclick="tab='${k}';render()"><svg viewBox="0 0 24 24"><path d="${p}"/></svg>${l}</button>`).join("");
+  if(view==="main"&&tab==="trends") drawChart();
+  c.scrollTop=top;
+}
+
+function drawChart(){
+  const cv=$("#chart"),M=METRICS[metric],rs=inWindow(win),s=stats(metric,win);
+  const dpr=devicePixelRatio||1,W=cv.clientWidth,H=220;cv.width=W*dpr;cv.height=H*dpr;
+  const g=cv.getContext("2d");g.scale(dpr,dpr);
+  const vals=rs.map(r=>r[metric]).concat([M.lo,M.hi]),mn=Math.min(...vals),mx=Math.max(...vals),pad=(mx-mn)*.1;
+  const y0=mn-pad,y1=mx+pad,t0=rs[0].time,t1=Date.now(),L=8,R=44,T=10,B=28;
+  const X=t=>L+(t-t0)/(t1-t0)*(W-L-R),Y=v=>T+(y1-v)/(y1-y0)*(H-T-B);
+  g.fillStyle="rgba(26,157,90,.14)";g.fillRect(L,Y(M.hi),W-L-R,Y(M.lo)-Y(M.hi));
+  g.strokeStyle="rgba(128,128,128,.25)";g.fillStyle=getComputedStyle(document.body).getPropertyValue("--muted");g.font="12px system-ui";g.textAlign="left";
+  const step=Math.pow(10,Math.floor(Math.log10(y1-y0)))*((y1-y0)>30?1:(y1-y0)>10?.5:.2);
+  for(let v=Math.ceil(y0/step)*step;v<=y1;v+=step){g.beginPath();g.moveTo(L,Y(v));g.lineTo(W-R,Y(v));g.stroke();g.fillText(fmt(metric,v),W-R+6,Y(v)+4)}
+  g.textAlign="center";for(let i=1;i<4;i++){const t=t0+(t1-t0)*i/4;g.beginPath();g.setLineDash([3,3]);g.moveTo(X(t),T);g.lineTo(X(t),H-B);g.stroke();g.setLineDash([]);g.fillText(hm(new Date(t)),X(t),H-8)}
+  g.strokeStyle=M.color;g.lineWidth=2.5;g.lineJoin="round";g.beginPath();rs.forEach((r,i)=>i?g.lineTo(X(r.time),Y(r[metric])):g.moveTo(X(r.time),Y(r[metric])));g.stroke();
+  g.fillStyle=M.color;g.beginPath();g.arc(X(s.lowAt),Y(s.low),5,0,7);g.fill();
+  g.fillStyle=getComputedStyle(document.body).getPropertyValue("--muted");g.textAlign=X(s.lowAt)<W/2?"left":"right";g.fillText(`Low ${fmt(metric,s.low)} · ${hm(new Date(s.lowAt))}`,X(s.lowAt)+(X(s.lowAt)<W/2?8:-8),Y(s.low)+18);
+}
+
+function downloadCSV(){
+  const csv="time,glucose_mmol_L,iop_mmHg,osmolarity_mOsm_L,temp_C,source\n"+readings.map(r=>`${new Date(r.time).toISOString()},${fmt("glucose",r.glucose)},${fmt("iop",r.iop)},${fmt("osmolarity",r.osmolarity)},${fmt("temp",r.temp)},${r.manual?"manual":"lens"}`).join("\n");
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="LensTrack PT-0001.csv";a.click();
+}
+
+// ---------- controls ----------
+function fit(){const [w,h]=$("#model").value.split(",").map(Number);$("#screen").style.width=w+"px";$("#screen").style.height=h+"px";
+  const avail=innerHeight-$("#controls").offsetHeight-48,sc=Math.min(1,avail/(h+28));$("#phone").style.transform=`scale(${sc})`;$("#stage").style.height=(h+28)*sc+"px"}
+$("#model").onchange=()=>{fit();render()};addEventListener("resize",fit);
+$("#theme").onclick=()=>{const d=document.documentElement.dataset.theme==="dark";document.documentElement.dataset.theme=d?"":"dark";$("#theme").textContent=d?"🌙 Dark mode":"☀️ Light mode";render()};
+$("#reset").onclick=()=>{seed();view="scan";tab="overview";render()};
+setInterval(()=>{readings.push(nextReading(Date.now()));lastSync=Date.now();if(view==="main")render()},5000);
+setInterval(()=>{$("#clock").textContent=hm(new Date())},1000);$("#clock").textContent=hm(new Date());
+
+seed();fit();render();
+</script>
+</body>
+</html>
