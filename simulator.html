@@ -48,6 +48,8 @@ canvas{width:100%;height:220px;display:block}
 .dev{display:flex;align-items:center;gap:12px;padding:14px;border:2px solid var(--line);border-radius:14px;background:var(--card);margin-bottom:10px;cursor:pointer}.dev.on{border-color:var(--teal)}.dev b{display:block;font-size:17px}.dev span{font-size:14px;color:var(--muted)}
 .step{display:flex;gap:12px;align-items:flex-start;margin:10px 0;font-size:16px}.step i{font-style:normal;font-weight:700;width:26px;height:26px;border-radius:50%;background:var(--chip);display:inline-flex;align-items:center;justify-content:center;font-size:13px;flex:none}
 .spacer{flex:1}
+.big{display:flex;gap:10px;margin:0 0 12px}.big .btn{min-height:76px;font-size:18px}.btn.listen{background:var(--red);color:#fff;border:0}.btn.blue{background:#dbe8ff;color:#1d4ed8;border:0}:root[data-theme=dark] .btn.blue{background:#1e2a4a;color:#93c5fd}
+.speak{margin-bottom:12px}
 </style>
 </head>
 <body>
@@ -106,6 +108,46 @@ function conditions(w){
   ];
 }
 
+// ---------- events + voice ----------
+const KINDS={eyeDrops:{name:"Eye drops",icon:"💧"},meal:{name:"Meal",icon:"🍚"},medication:{name:"Medication",icon:"💊"}};
+const lsGet=()=>{try{return JSON.parse(localStorage.getItem("events")||"[]")}catch{return[]}};   // ponytail: localStorage, per browser; sandboxed pages fall back to memory
+let events=lsGet();
+const saveEvents=()=>{try{localStorage.setItem("events",JSON.stringify(events))}catch{}};
+function logEvent(kind){const e={time:Date.now(),kind};events.push(e);saveEvents();speak(`${KINDS[kind].name} logged at ${hm(new Date(e.time))}.`);render();}
+const eventsIn=w=>{const c=Date.now()-WINDOWS[w]*1e3;return events.filter(e=>e.time>=c)};
+const lastDrops=()=>events.filter(e=>e.kind==="eyeDrops").at(-1);
+function parseKind(t){t=t.toLowerCase();
+  if(["drop","眼藥","藥水","眼药","药水"].some(k=>t.includes(k)))return"eyeDrops";
+  if(["meal","eat","ate","lunch","dinner","breakfast","food","吃","餐","飯","饭"].some(k=>t.includes(k)))return"meal";
+  if(["medic","pill","tablet","藥","药"].some(k=>t.includes(k)))return"medication";return null;}
+
+let speaking=false;
+function speak(text){const ss=window.speechSynthesis;if(!ss)return;
+  if(speaking){ss.cancel();speaking=false;render();return}
+  const u=new SpeechSynthesisUtterance(text);u.lang="en-US";u.rate=.9;
+  u.voice=ss.getVoices().find(v=>v.lang==="en-US"&&v.name.includes("Samantha"))||ss.getVoices().find(v=>v.lang.startsWith("en"))||null;
+  u.onstart=()=>{speaking=true;render()};u.onend=u.onerror=()=>{speaking=false;render()};ss.speak(u);}
+const spokenUnit={iop:"millimeters of mercury",glucose:"millimoles per liter",osmolarity:"milliosmoles per liter",temp:"degrees Celsius"};
+function spokenSummary(){const r=readings.at(-1);
+  const parts=["glucose","iop","osmolarity","temp"].map(m=>{const M=METRICS[m],v=r[m];const st=v>=M.lo&&v<=M.hi?"This is normal.":v>M.hi?"This is above the normal range.":"This is below the normal range.";return `Your ${M.name.toLowerCase()} is ${fmt(m,v)} ${spokenUnit[m]}. ${st}`});
+  const a=conditions("6 h").find(c=>c.status==="alert");const d=lastDrops();
+  return "Here are your latest readings. "+parts.join(" ")+(a?` Attention: your ${a.name.toLowerCase()} indicator is on alert. Please tell your doctor.`:"")+(d?` You last used eye drops at ${hm(new Date(d.time))}.`:"");}
+const spokenConditions=w=>`Condition summary for the last ${w.replace(" ","")}. `+conditions(w).map(c=>`${c.name}: ${S[c.status]}. ${c.summary}.`).join(" ");
+
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+let listening=false,transcript="",recog=null;
+function listen(){if(!SR)return;
+  if(listening){recog.stop();return}
+  recog=new SR();recog.lang=navigator.language||"en-US";recog.interimResults=true;transcript="";
+  recog.onresult=e=>{transcript=[...e.results].map(r=>r[0].transcript).join("");render()};
+  recog.onend=()=>{listening=false;const k=parseKind(transcript);if(k)logEvent(k);else{speak(transcript?"Sorry, I did not catch that. Please say eye drops, meal, or medication.":"I did not hear anything.");render()}};
+  recog.onerror=()=>{listening=false;render()};
+  recog.start();listening=true;render();setTimeout(()=>{if(listening)recog.stop()},6000);}
+const speakBtn=text=>`<button class="btn speak ${speaking?"listen":"primary"}" onclick="speak(${text})">${speaking?"⏹ Stop":"🔊 Read my readings aloud"}</button>`;
+const eventBtns=()=>`<div class="big"><button class="btn blue" onclick="logEvent('eyeDrops')">💧 I used eye drops</button>${SR?`<button class="btn ${listening?"listen":"primary"}" onclick="listen()">${listening?"〰 Listening…":"🎤 Speak"}</button>`:""}</div>
+  ${listening||transcript?`<p class="sub">${transcript?`“${transcript}”`:"Say “eye drops”, “meal” or “medication”"}</p>`:""}
+  ${lastDrops()?`<p class="sub">Last eye drops: ${hm(new Date(lastDrops().time))}</p>`:""}`;
+
 // ---------- state ----------
 let view="scan", tab="overview", win="6 h", metric="iop", lastSync=Date.now();
 const S={normal:"Normal",watch:"Watch",alert:"Alert"};
@@ -132,6 +174,7 @@ const screens={
     const above=inWindow("6 h").filter(x=>x.iop>21).length, peak=stats("iop","6 h").peak;
     return `<p class="eyebrow">PT-0001 · RIGHT EYE</p><h1>${greet}</h1>
     <p class="sub">${pill("normal").replace("Normal","Streaming")} &nbsp;updated ${Math.round((Date.now()-lastSync)/1000)} s ago · L-204</p>
+    ${speakBtn("spokenSummary()")}${eventBtns()}
     ${g.status!=="normal"?`<div class="banner"><span style="color:var(--red);font-size:22px">⚠</span><div><b>Eye pressure above range</b><p>${above} readings above 21 mmHg in the last 6 h, peak ${fmt("iop",peak)} mmHg. Tell your doctor if you have eye pain or blurred vision.</p></div></div>`:""}
     <p class="eyebrow">CURRENT READINGS</p><div class="grid">${["glucose","iop","osmolarity","temp"].map(m=>{const M=METRICS[m],v=r[m],ok=v>=M.lo&&v<=M.hi;
       return `<div class="card bar metric" style="--accent:${M.color};margin:0"><div class="name">${M.short}</div><div class="val">${fmt(m,v)}<small>${M.unit}</small></div><div class="rng">Range ${fmt(m,M.lo)}–${fmt(m,M.hi)}</div>${pill(ok?"normal":"alert")}</div>`}).join("")}</div>
@@ -144,13 +187,14 @@ const screens={
     <div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div><b style="font-size:17px">${M.name}</b><div class="sub" style="margin:2px 0 8px">${M.unit} · green band = ${fmt(metric,M.lo)}–${fmt(metric,M.hi)}</div></div><div style="font-size:30px;font-weight:800;color:${M.color}">${fmt(metric,readings.at(-1)[metric])}</div></div><canvas id="chart"></canvas></div>
     <div class="stats"><div class="card"><div class="k">Mean</div><div class="v">${fmt(metric,s.mean)} ${M.unit}</div></div><div class="card"><div class="k">Peak</div><div class="v">${fmt(metric,s.peak)} ${M.unit}</div></div><div class="card"><div class="k">Swing</div><div class="v">${fmt(metric,s.swing)} ${M.unit}</div></div></div>
     <div class="insight"><b>Insight</b>${ins}</div>`},
-  conditions(){ return `<h1>Condition tracking</h1><p class="sub">PT-0001 · last ${win} · ${inWindow(win).length} readings</p>${segHTML()}
+  conditions(){ return `<h1>Condition tracking</h1><p class="sub">PT-0001 · last ${win} · ${inWindow(win).length} readings</p>${segHTML()}${speakBtn("spokenConditions(win)")}
     ${conditions(win).map(c=>`<div class="card bar" style="--accent:var(--${c.status==="normal"?"green":c.status==="watch"?"orange":"red"})"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:19px">${c.name}</b>${pill(c.status)}</div><div style="margin:6px 0 4px;font-size:16px">${c.summary}</div><div class="sub" style="margin:0;font-size:14px">${c.th}</div></div>`).join("")}
     <p class="sub" style="font-size:14px">Thresholds are for reference only and do not replace a doctor's diagnosis.</p>`},
   history(){ const rs=inWindow("6 h").slice().reverse();
     return `<h1>History</h1><p class="sub">${rs.length} readings · last 6 h</p><p class="sub" style="font-size:14px">Glucose · IOP · Osmolarity · Temp.</p>
     <div class="card" style="display:flex;gap:12px;align-items:center"><span style="font-size:28px;background:var(--teal-bg);border-radius:10px;padding:4px 8px">▦</span><div><b>Share with your doctor</b><div class="sub" style="margin:2px 0 0;font-size:14px">Your doctor scans the code to view record PT-0001. You can revoke access at any time.</div></div></div>
     <button class="btn" onclick="downloadCSV()">Download CSV</button>
+    ${events.length?`<p class="eyebrow">EVENTS</p><div class="card" style="padding:4px 14px">${events.slice(-10).reverse().map(e=>`<div class="row"><span>${KINDS[e.kind].icon} ${KINDS[e.kind].name}</span><span class="s">${new Date(e.time).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}</span></div>`).join("")}</div>`:""}
     <div class="card" style="margin-top:12px;padding:4px 14px">${rs.slice(0,120).map(r=>`<div class="row"><div><div class="t">${hms(new Date(r.time))}</div><div class="s">${r.manual?"Manual entry":"Lens · auto"}</div></div><div class="v">${r.manual?`${fmt("glucose",r.glucose)} · – · – · –`:`${fmt("glucose",r.glucose)} · ${fmt("iop",r.iop)} · ${fmt("osmolarity",r.osmolarity)} · ${fmt("temp",r.temp)}`}</div></div>`).join("")}</div>`},
 };
 const segHTML=()=>`<div class="seg">${Object.keys(WINDOWS).map(w=>`<button class="${w===win?"on":""}" onclick="win='${w}';render()">${w}</button>`).join("")}</div>`;
@@ -179,6 +223,8 @@ function drawChart(){
   for(let v=Math.ceil(y0/step)*step;v<=y1;v+=step){g.beginPath();g.moveTo(L,Y(v));g.lineTo(W-R,Y(v));g.stroke();g.fillText(fmt(metric,v),W-R+6,Y(v)+4)}
   g.textAlign="center";for(let i=1;i<4;i++){const t=t0+(t1-t0)*i/4;g.beginPath();g.setLineDash([3,3]);g.moveTo(X(t),T);g.lineTo(X(t),H-B);g.stroke();g.setLineDash([]);g.fillText(hm(new Date(t)),X(t),H-8)}
   g.strokeStyle=M.color;g.lineWidth=2.5;g.lineJoin="round";g.beginPath();rs.forEach((r,i)=>i?g.lineTo(X(r.time),Y(r[metric])):g.moveTo(X(r.time),Y(r[metric])));g.stroke();
+  g.lineWidth=1;g.strokeStyle="rgba(128,128,128,.6)";g.setLineDash([4,4]);g.font="16px system-ui";g.textAlign="center";
+  eventsIn(win).forEach(e=>{g.beginPath();g.moveTo(X(e.time),T+14);g.lineTo(X(e.time),H-B);g.stroke();g.fillText(KINDS[e.kind].icon,X(e.time),T+12)});g.setLineDash([]);
   g.fillStyle=M.color;g.beginPath();g.arc(X(s.lowAt),Y(s.low),5,0,7);g.fill();
   g.fillStyle=getComputedStyle(document.body).getPropertyValue("--muted");g.textAlign=X(s.lowAt)<W/2?"left":"right";g.fillText(`Low ${fmt(metric,s.low)} · ${hm(new Date(s.lowAt))}`,X(s.lowAt)+(X(s.lowAt)<W/2?8:-8),Y(s.low)+18);
 }
@@ -193,7 +239,7 @@ function fit(){const [w,h]=$("#model").value.split(",").map(Number);$("#screen")
   const avail=innerHeight-$("#controls").offsetHeight-48,sc=Math.min(1,avail/(h+28));$("#phone").style.transform=`scale(${sc})`;$("#stage").style.height=(h+28)*sc+"px"}
 $("#model").onchange=()=>{fit();render()};addEventListener("resize",fit);
 $("#theme").onclick=()=>{const d=document.documentElement.dataset.theme==="dark";document.documentElement.dataset.theme=d?"":"dark";$("#theme").textContent=d?"🌙 Dark mode":"☀️ Light mode";render()};
-$("#reset").onclick=()=>{seed();view="scan";tab="overview";render()};
+$("#reset").onclick=()=>{events=[];saveEvents();seed();view="scan";tab="overview";render()};
 setInterval(()=>{readings.push(nextReading(Date.now()));lastSync=Date.now();if(view==="main")render()},5000);
 setInterval(()=>{$("#clock").textContent=hm(new Date())},1000);$("#clock").textContent=hm(new Date());
 
